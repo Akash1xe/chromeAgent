@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import random
 import socket
 import time
@@ -206,21 +207,25 @@ class BrowserAgent:
             try:
                 if self.browser:
                     state = await self.browser.get_browser_state_summary()
-                    if state.screenshot:
-                        width = self.settings.viewport_width
-                        height = self.settings.viewport_height
+                    screenshot = await self.browser.take_screenshot()
 
-                        if state.page_info:
-                            width = state.page_info.viewport_width
-                            height = state.page_info.viewport_height
+                    width = self.settings.viewport_width
+                    height = self.settings.viewport_height
 
-                        await self.emit(
-                            "screenshot",
-                            image=f"data:image/png;base64,{state.screenshot}",
-                            width=width,
-                            height=height,
-                            url=state.url,
-                        )
+                    if state.page_info:
+                        width = state.page_info.viewport_width
+                        height = state.page_info.viewport_height
+
+                    await self.emit(
+                        "screenshot",
+                        image=(
+                            "data:image/png;base64,"
+                            + base64.b64encode(screenshot).decode("ascii")
+                        ),
+                        width=width,
+                        height=height,
+                        url=state.url,
+                    )
             except Exception:
                 pass
 
@@ -443,6 +448,10 @@ class BrowserAgent:
                 use_vision="auto",
                 max_failures=3,
                 max_actions_per_step=1,
+                enable_planning=False,
+                use_judge=False,
+                max_history_items=12,
+                directly_open_url=True,
                 step_timeout=self.settings.step_timeout_seconds,
                 llm_timeout=self.settings.step_timeout_seconds,
                 available_file_paths=[str(uploads)],
