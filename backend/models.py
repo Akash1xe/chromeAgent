@@ -11,6 +11,7 @@ class RunRequest(BaseModel):
     provider: ProviderName = "auto"
     headless: bool = True
     max_steps: int = Field(default=20, ge=1, le=100)
+    uploaded_files: list[str] = Field(default_factory=list, max_length=10)
 
 
 class AgentAction(BaseModel):
