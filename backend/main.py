@@ -40,8 +40,8 @@ runs: dict[str, dict[str, Any]] = {}
 subscribers: dict[str, set[WebSocket]] = {}
 
 
-def router() -> LLMRouter:
-    return LLMRouter(get_settings())
+def router(preferred: str = "auto") -> LLMRouter:
+    return LLMRouter(get_settings(), preferred)
 
 
 async def broadcast(run_id: str, event: dict[str, Any]) -> None:
@@ -133,7 +133,7 @@ async def start_run(req: RunRequest):
         run_id,
         req,
         get_settings(),
-        router(),
+        router(req.provider),
         sink,
     )
 
