@@ -2,7 +2,7 @@ fastapi>=0.128,<1
 uvicorn[standard]>=0.40,<1
 playwright>=1.54,<2
 browser-use==0.13.8
-openai>=2.26,<3
+openai==2.16.0
 httpx>=0.28,<1
 pydantic>=2.12,<3
 pydantic-settings>=2.12,<3
