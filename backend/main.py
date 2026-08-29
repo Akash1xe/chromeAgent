@@ -115,6 +115,9 @@ async def start_run(req: RunRequest):
         "steps": [],
         "result": "",
         "duration": 0,
+        "message": "Starting browser…",
+        "takeover": False,
+        "user_action_reason": "",
     }
 
     async def sink(event: dict[str, Any]):
@@ -126,6 +129,15 @@ async def start_run(req: RunRequest):
                 "status",
                 item["status"],
             )
+            item["message"] = event.get(
+                "message",
+                item.get("message", ""),
+            )
+            if "takeover" in event:
+                item["takeover"] = bool(event.get("takeover"))
+
+        if event.get("type") == "needs_user_action":
+            item["user_action_reason"] = event.get("reason", "")
 
         await broadcast(run_id, event)
 
@@ -165,6 +177,9 @@ async def run_ws(websocket: WebSocket, run_id: str):
                     "run_id": run_id,
                     "status": item.get("status"),
                     "steps": item.get("steps", []),
+                    "message": item.get("message", ""),
+                    "takeover": bool(item.get("takeover", False)),
+                    "user_action_reason": item.get("user_action_reason", ""),
                 }
             )
 
@@ -185,6 +200,13 @@ def active_agent(run_id: str) -> BrowserAgent:
             status_code=404,
             detail="Active run not found",
         )
+
+    if item.get("status") in {"completed", "failed", "stopped"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Run is already finished",
+        )
+
     return item["agent"]
 
 
