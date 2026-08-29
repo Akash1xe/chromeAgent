@@ -279,6 +279,19 @@ class BrowserAgent:
             session_id=session.session_id,
         )
 
+    def _resolve_uploaded_files(self, uploads: Path) -> list[str]:
+        uploads = uploads.resolve()
+        available_files: list[str] = []
+
+        for name in self.request.uploaded_files:
+            candidate = (uploads / Path(name).name).resolve()
+            if uploads not in candidate.parents:
+                continue
+            if candidate.is_file():
+                available_files.append(str(candidate))
+
+        return available_files
+
     async def _screenshots(self) -> None:
         while not self.stop_requested:
             try:
@@ -518,13 +531,7 @@ class BrowserAgent:
             uploads = (Path(__file__).resolve().parent / "uploads").resolve()
             uploads.mkdir(parents=True, exist_ok=True)
 
-            available_files: list[str] = []
-            for name in self.request.uploaded_files:
-                candidate = (uploads / Path(name).name).resolve()
-                if uploads not in candidate.parents:
-                    continue
-                if candidate.is_file():
-                    available_files.append(str(candidate))
+            available_files = self._resolve_uploaded_files(uploads)
 
             file_hint = (
                 " Available upload files: " + ", ".join(available_files) + "."
