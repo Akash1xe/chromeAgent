@@ -9,7 +9,11 @@ ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -23,7 +27,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
 
     groq_model: str = "llama-3.3-70b-versatile"
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.7-flash"
     ollama_model: str = "mistral-small"
     ollama_base_url: str = "http://127.0.0.1:11434"
 
@@ -41,16 +45,24 @@ class Settings(BaseSettings):
     @property
     def groq_keys(self) -> list[str]:
         return [
-            key for key in [
-                self.groq_api_key_1, self.groq_api_key_2, self.groq_api_key_3,
-                self.groq_api_key_4, self.groq_api_key_5,
-            ] if key
+            key
+            for key in [
+                self.groq_api_key_1,
+                self.groq_api_key_2,
+                self.groq_api_key_3,
+                self.groq_api_key_4,
+                self.groq_api_key_5,
+            ]
+            if key
         ]
 
     @property
     def priorities(self) -> list[str]:
         valid = {"groq", "gemini", "ollama"}
-        result = [p.strip().lower() for p in self.provider_priority.split(",")]
+        result = [
+            p.strip().lower()
+            for p in self.provider_priority.split(",")
+        ]
         result = [p for p in result if p in valid]
         return result or ["groq", "gemini", "ollama"]
 
