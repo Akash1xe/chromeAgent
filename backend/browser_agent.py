@@ -430,26 +430,43 @@ class BrowserAgent:
                 reason="payment_confirmation",
             )
 
+    async def _set_dom_health(self, agent: Agent, has_dom: bool) -> None:
+        was_using_vision = bool(self.router.vision_required)
+
+        if has_dom:
+            self.dom_failures = 0
+            self.router.vision_required = False
+            agent.settings.use_vision = "auto"
+
+            if was_using_vision:
+                await self.emit(
+                    "status",
+                    status="running",
+                    message="DOM recovered; returned to DOM-first mode",
+                )
+            return
+
+        self.dom_failures += 1
+        if self.dom_failures < 2:
+            return
+
+        self.router.vision_required = True
+        agent.settings.use_vision = True
+
+        if not was_using_vision:
+            await self.emit(
+                "status",
+                status="running",
+                message="DOM unavailable twice; vision fallback enabled",
+            )
+
     async def _on_step_start(self, agent: Agent) -> None:
         try:
             state = await agent.browser_session.get_browser_state_summary()
             selector_map = getattr(state.dom_state, "selector_map", {})
-            if selector_map:
-                self.dom_failures = 0
-                self.router.vision_required = False
-            else:
-                self.dom_failures += 1
-
-            if self.dom_failures >= 2:
-                self.router.vision_required = True
-                agent.settings.use_vision = True
-                await self.emit(
-                    "status",
-                    status="running",
-                    message="DOM unavailable twice; vision fallback enabled",
-                )
+            await self._set_dom_health(agent, bool(selector_map))
         except Exception:
-            self.dom_failures += 1
+            await self._set_dom_health(agent, False)
 
         await self._safety_check(agent)
 
@@ -548,7 +565,7 @@ class BrowserAgent:
                 max_actions_per_step=1,
                 enable_planning=False,
                 use_judge=False,
-                max_history_items=12,
+                max_history_items=8,
                 directly_open_url=True,
                 step_timeout=self.settings.step_timeout_seconds,
                 llm_timeout=self.settings.step_timeout_seconds,
@@ -558,7 +575,11 @@ class BrowserAgent:
                     "or payment confirmation. Prefer DOM/index actions. Use screenshots "
                     "or coordinate interaction only when DOM interaction is insufficient. "
                     "For hover or drag interactions, use the browser evaluate tool when "
-                    "a dedicated DOM action is unavailable."
+                    "a dedicated DOM action is unavailable. Dismiss cookie/consent banners "
+                    "when they block the task; prefer reject/necessary-only when equally "
+                    "available. For dynamic content, use browser state or wait tools rather "
+                    "than fixed sleeps. For simple navigation, navigate directly and finish "
+                    "as soon as the requested page is confirmed."
                     + file_hint
                 ),
             )
@@ -590,10 +611,16 @@ class BrowserAgent:
 
             else:
                 status = "failed"
-                final_result = (
-                    history.final_result()
-                    or "Agent stopped before reporting successful completion"
-                )
+                if self.step_number >= self.request.max_steps:
+                    final_result = (
+                        history.final_result()
+                        or f"Maximum step limit reached ({self.request.max_steps}) before completion"
+                    )
+                else:
+                    final_result = (
+                        history.final_result()
+                        or "Agent stopped before reporting successful completion"
+                    )
 
             return {
                 "status": status,
