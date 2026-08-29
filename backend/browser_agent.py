@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import random
+import re
 import socket
 import time
 from datetime import datetime, timezone
@@ -69,6 +70,104 @@ class BrowserAgent:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", 0))
             return int(sock.getsockname()[1])
+
+    @staticmethod
+    def _simple_navigation_url(task: str) -> str | None:
+        normalized = " ".join(task.strip().split())
+        match = re.fullmatch(
+            r"(?i)(?:open|go to|navigate to)\s+(https?://\S+|[A-Za-z0-9.-]+)"
+            r"(?:\s+(?:website|site))?[.!]?",
+            normalized,
+        )
+        if not match:
+            return None
+
+        target = match.group(1).rstrip(".")
+        if target.lower().startswith(("http://", "https://")):
+            return target
+
+        aliases = {
+            "flipkart": "https://www.flipkart.com",
+            "google": "https://www.google.com",
+            "github": "https://github.com",
+            "youtube": "https://www.youtube.com",
+            "gmail": "https://mail.google.com",
+            "wikipedia": "https://www.wikipedia.org",
+            "amazon": "https://www.amazon.in",
+            "reddit": "https://www.reddit.com",
+            "linkedin": "https://www.linkedin.com",
+        }
+        alias = aliases.get(target.lower())
+        if alias:
+            return alias
+
+        if "." in target and " " not in target:
+            return f"https://{target}"
+
+        return None
+
+    async def _run_navigation_fast_path(self, url: str) -> dict[str, Any]:
+        if not self.playwright_browser:
+            raise RuntimeError("Playwright Chromium is not available")
+
+        context = await self.playwright_browser.new_context(
+            viewport={
+                "width": self.settings.viewport_width,
+                "height": self.settings.viewport_height,
+            }
+        )
+        page = await context.new_page()
+
+        await self.emit(
+            "status",
+            status="running",
+            message=f"Opening {url} directly without an LLM call",
+        )
+
+        try:
+            await page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=self.settings.step_timeout_seconds * 1000,
+            )
+            await page.wait_for_load_state(
+                "domcontentloaded",
+                timeout=self.settings.step_timeout_seconds * 1000,
+            )
+
+            screenshot = await page.screenshot(type="png")
+            record = {
+                "step": 1,
+                "action": "navigate",
+                "target": page.url,
+                "value": None,
+                "provider": "direct",
+                "success": True,
+                "reasoning": "Deterministic simple-navigation fast path; no LLM required",
+                "result": (await page.title()) or page.url,
+            }
+            self.steps.append(record)
+            self.step_number = 1
+            await self.emit("step", **record)
+            await self.emit(
+                "screenshot",
+                image=(
+                    "data:image/png;base64,"
+                    + base64.b64encode(screenshot).decode("ascii")
+                ),
+                width=self.settings.viewport_width,
+                height=self.settings.viewport_height,
+                url=page.url,
+            )
+
+            return {
+                "status": "completed",
+                "result": f"Opened {page.url}",
+                "steps": self.steps,
+                "duration": round(time.monotonic() - self.started, 2),
+            }
+        finally:
+            await context.close()
 
     async def _wait_for_cdp(self, port: int) -> str:
         url = f"http://127.0.0.1:{port}"
@@ -545,6 +644,11 @@ class BrowserAgent:
 
         try:
             self.browser = await self._launch_browser()
+
+            fast_url = self._simple_navigation_url(self.request.task)
+            if fast_url:
+                return await self._run_navigation_fast_path(fast_url)
+
             uploads = (Path(__file__).resolve().parent / "uploads").resolve()
             uploads.mkdir(parents=True, exist_ok=True)
 
