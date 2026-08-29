@@ -47,7 +47,15 @@ class UsageTracker:
         except Exception:
             pass
 
+    def _ensure_day(self) -> None:
+        current_day = date.today().isoformat()
+        if current_day != self.day:
+            self.day = current_day
+            self.daily.clear()
+            self.minute_calls.clear()
+
     def record(self, key_id: str) -> None:
+        self._ensure_day()
         now = time.time()
         q = self.minute_calls[key_id]
         q.append(now)
@@ -71,6 +79,7 @@ class UsageTracker:
         )
 
     def snapshot(self) -> dict[str, dict[str, int]]:
+        self._ensure_day()
         now = time.time()
         out: dict[str, dict[str, int]] = {}
         for key_id in set(self.daily) | set(self.minute_calls):
