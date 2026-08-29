@@ -227,6 +227,30 @@ function BrowserView({
       },
     );
 
+  const scroll = (deltaY, deltaX = 0) => {
+    if (!takeover || !runId) return Promise.resolve();
+    return api(
+      `/api/runs/${runId}/manual/scroll`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          delta_x: deltaX,
+          delta_y: deltaY,
+        }),
+      },
+    );
+  };
+
+  const wheel = (event) => {
+    if (!takeover) return;
+    event.preventDefault();
+    const delta = Math.max(
+      -1200,
+      Math.min(1200, event.deltaY),
+    );
+    scroll(delta);
+  };
+
   return (
     <div className="card browser-card">
       <div className="card-title">
@@ -248,6 +272,7 @@ function BrowserView({
           <img
             ref={imageRef}
             onClick={click}
+            onWheel={wheel}
             src={screenshot}
             alt="Live browser"
           />
@@ -274,6 +299,20 @@ function BrowserView({
           <button onClick={() => key("Enter")}>Enter</button>
           <button onClick={() => key("Tab")}>Tab</button>
           <button onClick={() => key("Escape")}>Esc</button>
+          <button onClick={() => key("Backspace")}>⌫</button>
+          <button onClick={() => key("Control+A")}>Ctrl+A</button>
+          <button onClick={() => key("Control+C")}>Ctrl+C</button>
+          <button onClick={() => key("Control+V")}>Ctrl+V</button>
+          <button onClick={() => key("ArrowLeft")}>←</button>
+          <button onClick={() => key("ArrowUp")}>↑</button>
+          <button onClick={() => key("ArrowDown")}>↓</button>
+          <button onClick={() => key("ArrowRight")}>→</button>
+          <button onClick={() => key("Home")}>Home</button>
+          <button onClick={() => key("End")}>End</button>
+          <button onClick={() => key("PageUp")}>PgUp</button>
+          <button onClick={() => key("PageDown")}>PgDn</button>
+          <button onClick={() => scroll(-650)}>Scroll ↑</button>
+          <button onClick={() => scroll(650)}>Scroll ↓</button>
         </div>
       )}
     </div>
