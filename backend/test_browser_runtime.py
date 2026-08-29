@@ -56,11 +56,13 @@ async def test_playwright_chromium_can_attach_to_browser_use():
         )
 
         await browser_use.start()
-        state = await browser_use.get_browser_state_summary(include_screenshot=True)
+        state = await browser_use.get_browser_state_summary()
+        screenshot = await browser_use.take_screenshot()
 
         assert state is not None
         assert state.url
-        assert state.screenshot
+        assert screenshot
+        assert screenshot.startswith(b"\x89PNG")
         assert browser_use.is_cdp_connected
 
     finally:
