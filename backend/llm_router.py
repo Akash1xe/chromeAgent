@@ -78,6 +78,7 @@ class LLMRouter:
         self.usage = UsageTracker(settings.usage_file)
         self._groq_cursor = 0
         self.last_provider = "none"
+        self.vision_required = False
         self.model = "chrome-agent-router"
 
     @property
@@ -89,6 +90,10 @@ class LLMRouter:
         return self.model
 
     def _order(self) -> list[str]:
+        if self.vision_required and self.settings.gemini_api_key:
+            return ["gemini"] + [
+                p for p in self.settings.priorities if p != "gemini"
+            ]
         if self.preferred == "auto":
             return self.settings.priorities
         return [self.preferred] + [
