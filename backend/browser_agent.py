@@ -51,6 +51,7 @@ class BrowserAgent:
         self.steps: list[dict[str, Any]] = []
         self._safety_pause_reason: str | None = None
         self._blocking_hits = 0
+        self.failure_reason: str | None = None
 
     async def emit(self, kind: str, **payload: Any) -> None:
         await self.sink(
@@ -293,12 +294,16 @@ class BrowserAgent:
             self._blocking_hits = 0
 
         if self._blocking_hits >= 2:
+            self.failure_reason = (
+                "Repeated site-level anti-bot blocking detected; "
+                "stopping instead of retrying"
+            )
             self.stop_requested = True
             agent.stop()
             await self.emit(
                 "status",
                 status="failed",
-                message="Repeated site-level anti-bot blocking detected; stopping instead of retrying",
+                message=self.failure_reason,
             )
             return
 
@@ -461,7 +466,11 @@ class BrowserAgent:
                 on_step_end=self._on_step_end,
             )
 
-            if self.stop_requested:
+            if self.failure_reason:
+                status = "failed"
+                final_result = self.failure_reason
+
+            elif self.stop_requested:
                 status = "stopped"
                 final_result = "Stopped by user"
 
