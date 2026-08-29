@@ -84,8 +84,32 @@ async def test_human_browser_action_primitives(tmp_path):
         await page.locator("#hover-target").hover()
         assert await page.locator("#hover-menu").is_visible()
 
-        # Drag and drop.
-        await page.locator("#drag").drag_to(page.locator("#drop"))
+        # Drag-and-drop fallback used by browser-use 0.13.8: browser JavaScript.
+        await page.evaluate("""
+            (() => {
+              const source = document.querySelector('#drag');
+              const target = document.querySelector('#drop');
+              const data = new DataTransfer();
+              source.dispatchEvent(new DragEvent('dragstart', {
+                bubbles: true,
+                dataTransfer: data,
+              }));
+              target.dispatchEvent(new DragEvent('dragover', {
+                bubbles: true,
+                cancelable: true,
+                dataTransfer: data,
+              }));
+              target.dispatchEvent(new DragEvent('drop', {
+                bubbles: true,
+                cancelable: true,
+                dataTransfer: data,
+              }));
+              source.dispatchEvent(new DragEvent('dragend', {
+                bubbles: true,
+                dataTransfer: data,
+              }));
+            })()
+        """)
         assert await page.locator("#drop").inner_text() == "dropped"
 
         # File upload.
