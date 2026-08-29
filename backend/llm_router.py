@@ -164,14 +164,15 @@ class LLMRouter:
                     base_url="https://api.groq.com/openai/v1",
                     max_retries=0,
                 )
-                response = await client.chat.completions.create(
-                    model=self.settings.groq_model,
-                    messages=groq_messages,
-                    temperature=0.1,
-                    response_format={"type": "json_object"}
-                    if output_format is not None
-                    else None,
-                )
+                request_kwargs: dict[str, Any] = {
+                    "model": self.settings.groq_model,
+                    "messages": groq_messages,
+                    "temperature": 0.1,
+                }
+                if output_format is not None:
+                    request_kwargs["response_format"] = {"type": "json_object"}
+
+                response = await client.chat.completions.create(**request_kwargs)
                 content = response.choices[0].message.content or ""
                 self._groq_cursor = idx
 
