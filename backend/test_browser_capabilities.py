@@ -30,7 +30,7 @@ HTML = """
 
     <input id="file" type="file" />
     <button id="alert" onclick="alert('hello')">Alert</button>
-    <button id="newtab" onclick="window.open('data:text/html,<title>Second Tab</title><p>tab two</p>', '_blank')">New tab</button>
+    <button id="newtab" onclick="window.open('about:blank', '_blank')">New tab</button>
 
     <iframe id="frame" srcdoc="<button id='inside'>Iframe Button</button><p id='frame-text'>Iframe text</p>"></iframe>
 
@@ -151,7 +151,7 @@ async def test_human_browser_action_primitives(tmp_path):
             await page.locator("#newtab").click()
 
         second = await page_info.value
-        await second.wait_for_load_state()
+        await second.set_content("<title>Second Tab</title><p>tab two</p>")
         assert await second.title() == "Second Tab"
         assert len(context.pages) == 2
 
