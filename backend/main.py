@@ -275,7 +275,17 @@ async def history():
                 | {
                     "step_count": len(
                         data.get("steps", [])
-                    )
+                    ),
+                    "providers_used": sorted({
+                        step.get("provider")
+                        for step in data.get("steps", [])
+                        if step.get("provider")
+                    }),
+                    "providers_used": sorted({
+                        step.get("provider")
+                        for step in data.get("steps", [])
+                        if step.get("provider")
+                    }),
                 }
             )
         except Exception:
