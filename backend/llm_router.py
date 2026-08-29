@@ -37,6 +37,13 @@ class UsageTracker:
             data = json.loads(self.path.read_text("utf-8"))
             if data.get("day") == self.day:
                 self.daily.update(data.get("daily", {}))
+                now = time.time()
+                for key_id, timestamps in data.get("recent", {}).items():
+                    self.minute_calls[key_id].extend(
+                        float(ts)
+                        for ts in timestamps
+                        if now - float(ts) <= 60
+                    )
         except Exception:
             pass
 
@@ -49,7 +56,17 @@ class UsageTracker:
         self.daily[key_id] += 1
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(
-            json.dumps({"day": self.day, "daily": dict(self.daily)}, indent=2),
+            json.dumps(
+                {
+                    "day": self.day,
+                    "daily": dict(self.daily),
+                    "recent": {
+                        key: list(values)
+                        for key, values in self.minute_calls.items()
+                    },
+                },
+                indent=2,
+            ),
             "utf-8",
         )
 
