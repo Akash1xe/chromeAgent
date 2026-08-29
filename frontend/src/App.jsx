@@ -16,9 +16,10 @@ const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const WS = API.replace(/^http/, "ws");
 
 async function api(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(`${API}${path}`, {
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
     },
     ...options,
@@ -42,6 +43,9 @@ function TaskPanel({ onRun, busy }) {
   const [provider, setProvider] = useState("auto");
   const [headless, setHeadless] = useState(true);
   const [maxSteps, setMaxSteps] = useState(20);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const submit = (event) => {
     event.preventDefault();
@@ -52,7 +56,36 @@ function TaskPanel({ onRun, busy }) {
       provider,
       headless,
       max_steps: Number(maxSteps),
+      uploaded_files: uploadedFiles.map((file) => file.name),
     });
+  };
+
+  const uploadFiles = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 10);
+    if (!files.length) return;
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      const uploaded = [];
+      for (const file of files) {
+        const form = new FormData();
+        form.append("file", file);
+        uploaded.push(
+          await api("/api/uploads", {
+            method: "POST",
+            body: form,
+          }),
+        );
+      }
+      setUploadedFiles(uploaded);
+    } catch (error) {
+      setUploadError(error.message);
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -95,6 +128,24 @@ function TaskPanel({ onRun, busy }) {
         </label>
       </div>
 
+      <label>
+        Attach files for browser upload
+        <input
+          type="file"
+          multiple
+          disabled={busy || uploading}
+          onChange={uploadFiles}
+        />
+      </label>
+
+      {uploading && <div className="muted">Uploading files…</div>}
+      {uploadError && <div className="notice">{uploadError}</div>}
+      {uploadedFiles.length > 0 && (
+        <div className="muted">
+          Ready: {uploadedFiles.map((file) => file.original_name).join(", ")}
+        </div>
+      )}
+
       <label className="toggle">
         <input
           type="checkbox"
@@ -104,7 +155,10 @@ function TaskPanel({ onRun, busy }) {
         Run browser headless
       </label>
 
-      <button className="primary" disabled={busy || !task.trim()}>
+      <button
+        className="primary"
+        disabled={busy || uploading || !task.trim()}
+      >
         <Play size={17} />
         Run
       </button>
