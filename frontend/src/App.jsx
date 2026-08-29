@@ -386,6 +386,9 @@ function HistoryPanel({ onOpen, refreshToken }) {
               <small>
                 {item.step_count} steps ·{" "}
                 {item.duration || 0}s
+                {item.providers_used?.length
+                  ? ` · ${item.providers_used.join(" → ")}`
+                  : ""}
               </small>
             </div>
           </button>
