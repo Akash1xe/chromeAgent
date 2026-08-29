@@ -250,71 +250,38 @@ async def manual_key(
 async def history():
     items = []
 
+    def summary(data: dict[str, Any]) -> dict[str, Any]:
+        steps = data.get("steps", [])
+        return {
+            "id": data.get("id"),
+            "task": data.get("task"),
+            "status": data.get("status"),
+            "duration": data.get("duration", 0),
+            "provider": data.get("provider"),
+            "providers_used": sorted({
+                step.get("provider")
+                for step in steps
+                if step.get("provider")
+            }),
+            "created_at": data.get("created_at"),
+            "finished_at": data.get("finished_at"),
+            "step_count": len(steps),
+        }
+
     for path in sorted(
         get_settings().logs_dir.glob("*.json"),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     ):
         try:
-            data = json.loads(
-                path.read_text("utf-8")
-            )
-            items.append(
-                {
-                    k: data.get(k)
-                    for k in [
-                        "id",
-                        "task",
-                        "status",
-                        "duration",
-                        "provider",
-                        "created_at",
-                        "finished_at",
-                    ]
-                }
-                | {
-                    "step_count": len(
-                        data.get("steps", [])
-                    ),
-                    "providers_used": sorted({
-                        step.get("provider")
-                        for step in data.get("steps", [])
-                        if step.get("provider")
-                    }),
-                    "providers_used": sorted({
-                        step.get("provider")
-                        for step in data.get("steps", [])
-                        if step.get("provider")
-                    }),
-                }
-            )
+            items.append(summary(json.loads(path.read_text("utf-8"))))
         except Exception:
             continue
 
+    known_ids = {item.get("id") for item in items}
     for run_id, data in runs.items():
-        if not any(
-            x.get("id") == run_id
-            for x in items
-        ):
-            items.insert(
-                0,
-                {
-                    "id": run_id,
-                    "task": data["task"],
-                    "status": data["status"],
-                    "duration": data.get(
-                        "duration",
-                        0,
-                    ),
-                    "provider": data["provider"],
-                    "created_at": data[
-                        "created_at"
-                    ],
-                    "step_count": len(
-                        data.get("steps", [])
-                    ),
-                },
-            )
+        if run_id not in known_ids:
+            items.insert(0, summary(data))
 
     return items[:100]
 
