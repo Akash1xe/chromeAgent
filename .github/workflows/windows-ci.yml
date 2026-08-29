@@ -12,7 +12,7 @@ permissions:
 jobs:
   windows-readiness:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -40,11 +40,28 @@ jobs:
         working-directory: frontend
         run: npm install --no-audit --no-fund
 
-      - name: Run backend tests
+      - name: Run backend unit tests
         working-directory: backend
         env:
           PYTHONPATH: .
-        run: python -m pytest -q
+        run: >
+          python -m pytest -q
+          --ignore=test_browser_runtime.py
+          --ignore=test_browser_capabilities.py
+
+      - name: Test Chromium browser primitives
+        working-directory: backend
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -vv -s test_browser_capabilities.py
+
+      - name: Test Browser Use CDP attachment
+        working-directory: backend
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -vv -s test_browser_runtime.py
 
       - name: Build frontend
         working-directory: frontend
@@ -55,7 +72,7 @@ jobs:
         run: python doctor.py
 
       - name: Compile launcher
-        run: python -m py_compile run.py backend/doctor.py
+        run: python -m py_compile run.py backend/doctor.py backend/acceptance_benchmark.py
 
       - name: Parse PowerShell bootstrap
         shell: pwsh
