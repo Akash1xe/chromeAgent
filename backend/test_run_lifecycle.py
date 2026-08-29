@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -144,3 +145,81 @@ async def test_run_failure_is_persisted(tmp_path, monkeypatch):
     assert saved["status"] == "failed"
     assert "simulated failure" in saved["result"]
     assert saved["finished_at"]
+
+
+@pytest.mark.asyncio
+async def test_intervention_state_survives_snapshot_source(tmp_path, monkeypatch):
+    settings = Settings(
+        _env_file=None,
+        logs_dir=tmp_path / "logs",
+        usage_file=tmp_path / "usage.json",
+    )
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+
+    class BlockingAgent(FakeBrowserAgent):
+        release = asyncio.Event()
+
+        async def run(self):
+            await self.sink(
+                {
+                    "type": "status",
+                    "run_id": self.run_id,
+                    "status": "paused",
+                    "message": "Manual takeover active",
+                    "takeover": True,
+                }
+            )
+            await self.sink(
+                {
+                    "type": "needs_user_action",
+                    "run_id": self.run_id,
+                    "reason": "authentication_or_captcha",
+                }
+            )
+            await self.release.wait()
+            return {
+                "status": "stopped",
+                "result": "Stopped",
+                "steps": [],
+                "duration": 0.01,
+            }
+
+    BlockingAgent.release = asyncio.Event()
+
+    monkeypatch.setattr(main, "get_settings", lambda: settings)
+    monkeypatch.setattr(main, "BrowserAgent", BlockingAgent)
+    monkeypatch.setattr(main, "router", lambda preferred="auto": object())
+
+    main.runs.clear()
+    main.subscribers.clear()
+
+    response = await main.start_run(RunRequest(task="Wait for user"))
+    run_id = response["id"]
+
+    for _ in range(50):
+        item = main.runs[run_id]
+        if item.get("user_action_reason"):
+            break
+        await asyncio.sleep(0.01)
+
+    item = main.runs[run_id]
+    assert item["status"] == "paused"
+    assert item["message"] == "Manual takeover active"
+    assert item["takeover"] is True
+    assert item["user_action_reason"] == "authentication_or_captcha"
+
+    BlockingAgent.release.set()
+    await item["task_handle"]
+
+
+def test_finished_run_rejects_intervention():
+    main.runs.clear()
+    main.runs["done"] = {
+        "status": "completed",
+        "agent": object(),
+    }
+
+    with pytest.raises(Exception) as exc_info:
+        main.active_agent("done")
+
+    assert getattr(exc_info.value, "status_code", None) == 409
