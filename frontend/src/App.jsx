@@ -133,7 +133,11 @@ function Controls({ runId, status, takeover, userActionReason, onChange }) {
 
       <button
         onClick={() => action("takeover")}
-        disabled={!runId || takeover}
+        disabled={
+          !runId ||
+          takeover ||
+          ["completed", "failed", "stopped", "stopping"].includes(status)
+        }
       >
         <Monitor size={16} />
         Take Over
@@ -617,6 +621,9 @@ export default function App() {
 
       if (data.type === "snapshot") {
         setStatus(data.status || "starting");
+        setMessage(data.message || "");
+        setTakeover(Boolean(data.takeover));
+        setUserActionReason(data.user_action_reason || "");
         if (data.steps) {
           setSteps(data.steps);
         }
