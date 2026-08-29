@@ -431,6 +431,20 @@ function SettingsPanel() {
     load();
   };
 
+  const testKey = async (name) => {
+    setTesting(name);
+    const result = await api(
+      `/api/settings/test-key/${name}`,
+      { method: "POST" },
+    );
+    setNotice(
+      result.ok
+        ? `${name} is working`
+        : `${name}: ${result.error}`,
+    );
+    setTesting("");
+  };
+
   const test = async (provider) => {
     setTesting(provider);
     const result = await api(
@@ -493,6 +507,13 @@ function SettingsPanel() {
 
             <button onClick={() => saveKey(name)}>
               Save
+            </button>
+
+            <button
+              onClick={() => testKey(name)}
+              disabled={testing === name || !data.keys[name]}
+            >
+              Test
             </button>
 
             <button onClick={() => removeKey(name)}>
