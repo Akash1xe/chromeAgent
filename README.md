@@ -113,6 +113,32 @@ cd backend
 ..\.venv\Scripts\python.exe doctor.py
 ```
 
+
+### Local performance benchmark
+
+Before testing LLM-driven tasks, you can measure raw Chromium startup and direct-navigation speed without consuming any Groq, Gemini, or Ollama quota:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe acceptance_benchmark.py --url https://www.flipkart.com --runs 3
+```
+
+The benchmark reports Chromium launch time, navigation time, and total median time. This isolates browser/runtime performance from model latency.
+
+For the first dashboard acceptance run, use:
+
+```text
+Open Flipkart
+```
+
+That command should use the deterministic direct-navigation path and show provider `direct` in the step log. Then test a true agent task such as:
+
+```text
+Open Flipkart and search for laptops
+```
+
+The second command should use Browser Use and the configured LLM fallback chain.
+
 Manual setup remains possible if preferred.
 
 Create and activate a virtual environment:
