@@ -441,6 +441,32 @@ async def delete_key(name: str):
     return {"ok": True}
 
 
+@app.post("/api/settings/test-key/{name}")
+async def test_key(name: str):
+    allowed = {
+        "GROQ_API_KEY_1",
+        "GROQ_API_KEY_2",
+        "GROQ_API_KEY_3",
+        "GROQ_API_KEY_4",
+        "GROQ_API_KEY_5",
+        "GEMINI_API_KEY",
+    }
+    if name not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid key name",
+        )
+
+    try:
+        return await router().test_key(name)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "key": name,
+            "error": str(exc),
+        }
+
+
 @app.post("/api/settings/test/{provider}")
 async def test_provider(provider: str):
     if provider not in {
