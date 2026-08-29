@@ -222,6 +222,53 @@ class LLMRouter:
         )
         return await model.ainvoke(messages, output_format)
 
+    async def test_key(self, name: str) -> dict[str, Any]:
+        groq_map = {
+            "GROQ_API_KEY_1": self.settings.groq_api_key_1,
+            "GROQ_API_KEY_2": self.settings.groq_api_key_2,
+            "GROQ_API_KEY_3": self.settings.groq_api_key_3,
+            "GROQ_API_KEY_4": self.settings.groq_api_key_4,
+            "GROQ_API_KEY_5": self.settings.groq_api_key_5,
+        }
+
+        if name in groq_map:
+            key = groq_map[name]
+            if not key:
+                raise RuntimeError(f"{name} is not configured")
+            client = AsyncOpenAI(
+                api_key=key,
+                base_url="https://api.groq.com/openai/v1",
+                max_retries=0,
+            )
+            await client.chat.completions.create(
+                model=self.settings.groq_model,
+                messages=[{"role": "user", "content": "Reply with ok"}],
+                max_tokens=4,
+            )
+            return {"ok": True, "key": name, "provider": "groq"}
+
+        if name == "GEMINI_API_KEY":
+            if not self.settings.gemini_api_key:
+                raise RuntimeError("GEMINI_API_KEY is not configured")
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{self.settings.gemini_model}:generateContent"
+            )
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.post(
+                    url,
+                    params={"key": self.settings.gemini_api_key},
+                    json={
+                        "contents": [
+                            {"parts": [{"text": "Reply with ok"}]}
+                        ]
+                    },
+                )
+                response.raise_for_status()
+            return {"ok": True, "key": name, "provider": "gemini"}
+
+        raise RuntimeError(f"Unknown key: {name}")
+
     async def test_provider(self, provider: str) -> dict[str, Any]:
         if provider == "groq":
             if not self.settings.groq_keys:
