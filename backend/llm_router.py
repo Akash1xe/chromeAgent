@@ -161,9 +161,10 @@ class LLMRouter:
 
         groq_messages = GroqMessageSerializer.serialize_messages(messages)
         last_error: Exception | None = None
+        start_cursor = self._groq_cursor
 
         for offset in range(len(keys)):
-            idx = (self._groq_cursor + offset) % len(keys)
+            idx = (start_cursor + offset) % len(keys)
             key_id = f"groq_{idx + 1}"
             self.usage.record(key_id)
 
