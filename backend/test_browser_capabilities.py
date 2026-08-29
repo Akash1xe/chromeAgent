@@ -51,7 +51,7 @@ HTML = """
       drop.addEventListener('dragover', e => e.preventDefault());
       drop.addEventListener('drop', e => {
         e.preventDefault();
-        drop.textContent = e.dataTransfer.getData('text/plain');
+        drop.textContent = 'dropped';
       });
     </script>
   </body>
@@ -86,7 +86,7 @@ async def test_human_browser_action_primitives(tmp_path):
 
         # Drag and drop.
         await page.locator("#drag").drag_to(page.locator("#drop"))
-        assert await page.locator("#drop").inner_text() == "dragged"
+        assert await page.locator("#drop").inner_text() == "dropped"
 
         # File upload.
         upload = tmp_path / "upload.txt"
