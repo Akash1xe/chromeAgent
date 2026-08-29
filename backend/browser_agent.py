@@ -515,8 +515,22 @@ class BrowserAgent:
 
         try:
             self.browser = await self._launch_browser()
-            uploads = Path(__file__).resolve().parent / "uploads"
+            uploads = (Path(__file__).resolve().parent / "uploads").resolve()
             uploads.mkdir(parents=True, exist_ok=True)
+
+            available_files: list[str] = []
+            for name in self.request.uploaded_files:
+                candidate = (uploads / Path(name).name).resolve()
+                if uploads not in candidate.parents:
+                    continue
+                if candidate.is_file():
+                    available_files.append(str(candidate))
+
+            file_hint = (
+                " Available upload files: " + ", ".join(available_files) + "."
+                if available_files
+                else ""
+            )
 
             self.agent = Agent(
                 task=self.request.task,
@@ -531,11 +545,14 @@ class BrowserAgent:
                 directly_open_url=True,
                 step_timeout=self.settings.step_timeout_seconds,
                 llm_timeout=self.settings.step_timeout_seconds,
-                available_file_paths=[str(uploads)],
+                available_file_paths=available_files,
                 extend_system_message=(
                     "Pause rather than trying to bypass CAPTCHA, OTP/2FA, login walls, "
                     "or payment confirmation. Prefer DOM/index actions. Use screenshots "
-                    "or coordinate interaction only when DOM interaction is insufficient."
+                    "or coordinate interaction only when DOM interaction is insufficient. "
+                    "For hover or drag interactions, use the browser evaluate tool when "
+                    "a dedicated DOM action is unavailable."
+                    + file_hint
                 ),
             )
 
