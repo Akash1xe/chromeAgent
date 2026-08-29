@@ -50,6 +50,7 @@ class BrowserAgent:
         self.dom_failures = 0
         self.steps: list[dict[str, Any]] = []
         self._safety_pause_reason: str | None = None
+        self._blocking_hits = 0
 
     async def emit(self, kind: str, **payload: Any) -> None:
         await self.sink(
@@ -277,6 +278,29 @@ class BrowserAgent:
             "pay now",
             "checkout",
         ]
+        anti_bot = [
+            "access denied",
+            "unusual traffic",
+            "automated queries",
+            "automated access",
+            "request blocked",
+            "temporarily blocked",
+        ]
+
+        if any(term in haystack for term in anti_bot):
+            self._blocking_hits += 1
+        else:
+            self._blocking_hits = 0
+
+        if self._blocking_hits >= 2:
+            self.stop_requested = True
+            agent.stop()
+            await self.emit(
+                "status",
+                status="failed",
+                message="Repeated site-level anti-bot blocking detected; stopping instead of retrying",
+            )
+            return
 
         if any(term in haystack for term in captcha_or_auth):
             self._safety_pause_reason = "authentication_or_captcha"
@@ -412,7 +436,7 @@ class BrowserAgent:
                 llm=self.router,
                 browser=self.browser,
                 use_vision="auto",
-                max_failures=2,
+                max_failures=3,
                 max_actions_per_step=1,
                 step_timeout=self.settings.step_timeout_seconds,
                 llm_timeout=self.settings.step_timeout_seconds,
