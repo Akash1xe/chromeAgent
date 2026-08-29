@@ -196,11 +196,88 @@ class BrowserAgent:
             raise RuntimeError("Take Over mode is not active")
 
         session = await self._cdp_session()
-        for event_type in ("keyDown", "keyUp"):
+        parts = [part.strip() for part in key.split("+") if part.strip()]
+        if not parts:
+            raise ValueError("Key must not be empty")
+
+        modifier_bits = {
+            "Alt": 1,
+            "Control": 2,
+            "Ctrl": 2,
+            "Meta": 4,
+            "Command": 4,
+            "Shift": 8,
+        }
+        modifier_keys = {
+            "Ctrl": "Control",
+            "Command": "Meta",
+        }
+
+        active_modifiers = 0
+        pressed_modifiers: list[tuple[str, int]] = []
+
+        for part in parts[:-1]:
+            if part not in modifier_bits:
+                raise ValueError(f"Unsupported modifier: {part}")
+
+            browser_key = modifier_keys.get(part, part)
+            bit = modifier_bits[part]
+            active_modifiers |= bit
+            pressed_modifiers.append((browser_key, bit))
+
             await self.browser.cdp_client.send.Input.dispatchKeyEvent(
-                params={"type": event_type, "key": key},
+                params={
+                    "type": "keyDown",
+                    "key": browser_key,
+                    "modifiers": active_modifiers,
+                },
                 session_id=session.session_id,
             )
+
+        final_key = parts[-1]
+        await self.browser.cdp_client.send.Input.dispatchKeyEvent(
+            params={
+                "type": "keyDown",
+                "key": final_key,
+                "modifiers": active_modifiers,
+            },
+            session_id=session.session_id,
+        )
+        await self.browser.cdp_client.send.Input.dispatchKeyEvent(
+            params={
+                "type": "keyUp",
+                "key": final_key,
+                "modifiers": active_modifiers,
+            },
+            session_id=session.session_id,
+        )
+
+        for browser_key, bit in reversed(pressed_modifiers):
+            active_modifiers &= ~bit
+            await self.browser.cdp_client.send.Input.dispatchKeyEvent(
+                params={
+                    "type": "keyUp",
+                    "key": browser_key,
+                    "modifiers": active_modifiers,
+                },
+                session_id=session.session_id,
+            )
+
+    async def manual_scroll(self, delta_x: float, delta_y: float) -> None:
+        if not self.takeover or not self.browser:
+            raise RuntimeError("Take Over mode is not active")
+
+        session = await self._cdp_session()
+        await self.browser.cdp_client.send.Input.dispatchMouseEvent(
+            params={
+                "type": "mouseWheel",
+                "x": self.settings.viewport_width / 2,
+                "y": self.settings.viewport_height / 2,
+                "deltaX": delta_x,
+                "deltaY": delta_y,
+            },
+            session_id=session.session_id,
+        )
 
     async def _screenshots(self) -> None:
         while not self.stop_requested:
