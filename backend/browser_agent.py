@@ -47,6 +47,7 @@ class BrowserAgent:
         self.stop_requested = False
         self.started = time.monotonic()
         self.step_number = 0
+        self.dom_failures = 0
         self.steps: list[dict[str, Any]] = []
         self._safety_pause_reason: str | None = None
 
@@ -306,6 +307,26 @@ class BrowserAgent:
             )
 
     async def _on_step_start(self, agent: Agent) -> None:
+        try:
+            state = await agent.browser_session.get_browser_state_summary()
+            selector_map = getattr(state.dom_state, "selector_map", {})
+            if selector_map:
+                self.dom_failures = 0
+                self.router.vision_required = False
+            else:
+                self.dom_failures += 1
+
+            if self.dom_failures >= 2:
+                self.router.vision_required = True
+                agent.settings.use_vision = True
+                await self.emit(
+                    "status",
+                    status="running",
+                    message="DOM unavailable twice; vision fallback enabled",
+                )
+        except Exception:
+            self.dom_failures += 1
+
         await self._safety_check(agent)
 
     async def _on_step_end(self, agent: Agent) -> None:
