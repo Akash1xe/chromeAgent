@@ -112,7 +112,7 @@ function TaskPanel({ onRun, busy }) {
   );
 }
 
-function Controls({ runId, status, takeover, onChange }) {
+function Controls({ runId, status, takeover, userActionReason, onChange }) {
   const action = async (name) => {
     if (!runId) return;
     await api(`/api/runs/${runId}/${name}`, {
@@ -147,7 +147,9 @@ function Controls({ runId, status, takeover, onChange }) {
         }
       >
         <Play size={16} />
-        Resume
+        {userActionReason === "payment_confirmation"
+          ? "Confirm & Resume"
+          : "Resume"}
       </button>
 
       <button
@@ -597,6 +599,7 @@ export default function App() {
     height: 900,
   });
   const [takeover, setTakeover] = useState(false);
+  const [userActionReason, setUserActionReason] = useState("");
   const [historyTick, setHistoryTick] = useState(0);
 
   useEffect(() => {
@@ -643,6 +646,7 @@ export default function App() {
       }
 
       if (data.type === "needs_user_action") {
+        setUserActionReason(data.reason || "");
         setMessage(
           `User action required: ${data.reason}`,
         );
@@ -658,6 +662,7 @@ export default function App() {
     setMessage("Starting browser…");
     setStatus("starting");
     setTakeover(false);
+    setUserActionReason("");
     setTab("agent");
 
     try {
@@ -770,12 +775,14 @@ export default function App() {
                   runId={runId}
                   status={status}
                   takeover={takeover}
+                  userActionReason={userActionReason}
                   onChange={(name) => {
                     if (name === "takeover") {
                       setTakeover(true);
                     }
                     if (name === "resume") {
                       setTakeover(false);
+                      setUserActionReason("");
                     }
                   }}
                 />
