@@ -9,3 +9,4 @@ pydantic-settings>=2.12,<3
 python-dotenv>=1.2,<2
 pytest>=8.4,<10
 pytest-asyncio>=1.1,<2
+python-multipart>=0.0.20,<1
