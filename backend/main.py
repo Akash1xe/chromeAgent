@@ -5,9 +5,10 @@ import json
 import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from browser_agent import BrowserAgent
@@ -102,6 +103,48 @@ async def health():
     return {"ok": True}
 
 
+UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+
+@app.post("/api/uploads")
+async def upload_file(file: UploadFile = File(...)):
+    original_name = Path(file.filename or "upload.bin").name
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", original_name).strip("._")
+    if not safe_name:
+        safe_name = "upload.bin"
+
+    stored_name = f"{uuid.uuid4().hex[:8]}_{safe_name}"
+    destination = (UPLOADS_DIR / stored_name).resolve()
+
+    if UPLOADS_DIR.resolve() not in destination.parents:
+        raise HTTPException(status_code=400, detail="Invalid upload path")
+
+    size = 0
+    try:
+        with destination.open("wb") as output:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    output.close()
+                    destination.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail="File exceeds 20 MB upload limit",
+                    )
+                output.write(chunk)
+    finally:
+        await file.close()
+
+    return {
+        "ok": True,
+        "name": stored_name,
+        "original_name": original_name,
+        "size": size,
+    }
+
+
 @app.post("/api/runs")
 async def start_run(req: RunRequest):
     run_id = uuid.uuid4().hex[:12]
@@ -112,6 +155,7 @@ async def start_run(req: RunRequest):
         "provider": req.provider,
         "headless": req.headless,
         "max_steps": req.max_steps,
+        "uploaded_files": req.uploaded_files,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "steps": [],
         "result": "",
