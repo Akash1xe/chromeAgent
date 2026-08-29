@@ -74,7 +74,7 @@ The Gemini model default was verified against Google's current model/free-tier i
 - Internet access for Groq/Gemini
 - Ollama only if you want the local fallback
 
-## Windows setup
+## Windows quick start
 
 Clone and enter the repository:
 
@@ -82,6 +82,38 @@ Clone and enter the repository:
 git clone https://github.com/Akash1xe/chromeAgent.git
 cd chromeAgent
 ```
+
+Run the first-time bootstrap:
+
+```powershell
+.\setup.ps1
+```
+
+If PowerShell blocks local scripts for the current shell, use:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup.ps1
+```
+
+The setup script creates `.venv`, installs backend dependencies, installs Playwright Chromium, installs frontend dependencies, creates `.env` when missing, and runs environment diagnostics.
+
+After setup, add any Groq/Gemini keys you want to use to `.env`, then start the whole app with one command:
+
+```powershell
+.\.venv\Scripts\python.exe run.py
+```
+
+The launcher starts FastAPI and Vite together, opens `http://127.0.0.1:5173`, and stops both child processes when you press Ctrl+C.
+
+You can rerun diagnostics at any time:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe doctor.py
+```
+
+Manual setup remains possible if preferred.
 
 Create and activate a virtual environment:
 
@@ -194,13 +226,9 @@ This keeps ordinary browsing fast and DOM-native while still allowing canvas-lik
 
 ## File uploads
 
-The agent is restricted to:
+Use the file picker in the Task panel before starting a run. Selected files are copied into the restricted local `backend/uploads/` directory with sanitized generated names, and only the exact files attached to that run are exposed to Browser Use.
 
-```text
-backend/uploads/
-```
-
-Place files that the agent is allowed to upload in that directory and mention the filename/path in the task. Runtime upload contents are ignored by Git.
+Uploads are limited to 20 MB per file and 10 files per run. Arbitrary local filesystem paths are not exposed to the agent. Runtime upload contents are ignored by Git.
 
 ## Logs and history
 
@@ -241,7 +269,7 @@ cd backend
 pytest -q
 ```
 
-The current smoke test verifies that the FastAPI application loads and the health endpoint responds successfully.
+The test suite covers API/config validation, provider fallback and Groq key rotation, run lifecycle persistence, manual CDP controls, Browser Use tool availability, real Chromium/CDP attachment, screenshots, browser primitives, secure uploads, navigation fast-path detection, and DOM-to-vision recovery.
 
 ## Main API
 
@@ -257,6 +285,8 @@ POST   /api/runs/{run_id}/stop
 POST   /api/runs/{run_id}/manual/click
 POST   /api/runs/{run_id}/manual/type
 POST   /api/runs/{run_id}/manual/key
+POST   /api/runs/{run_id}/manual/scroll
+POST   /api/uploads
 
 GET    /api/history
 GET    /api/history/{run_id}
