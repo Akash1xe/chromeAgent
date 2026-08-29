@@ -17,6 +17,7 @@ from models import (
     KeyUpdate,
     ManualClick,
     ManualKey,
+    ManualScroll,
     ManualType,
     PriorityUpdate,
     RunRequest,
@@ -264,6 +265,18 @@ async def manual_key(
 ):
     await active_agent(run_id).manual_key(
         body.key
+    )
+    return {"ok": True}
+
+
+@app.post("/api/runs/{run_id}/manual/scroll")
+async def manual_scroll(
+    run_id: str,
+    body: ManualScroll,
+):
+    await active_agent(run_id).manual_scroll(
+        body.delta_x,
+        body.delta_y,
     )
     return {"ok": True}
 
