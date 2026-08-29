@@ -39,7 +39,12 @@ class ManualType(BaseModel):
 
 
 class ManualKey(BaseModel):
-    key: str
+    key: str = Field(min_length=1, max_length=64)
+
+
+class ManualScroll(BaseModel):
+    delta_x: float = Field(default=0, ge=-5000, le=5000)
+    delta_y: float = Field(ge=-5000, le=5000)
 
 
 class KeyUpdate(BaseModel):
